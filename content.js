@@ -6,16 +6,37 @@
 (function() {
   'use strict';
 
+  // --- SEC-05: Debug flag instead of console.log everywhere ---
+  var DEBUG = false;
+  function log() { if (DEBUG) console.log.apply(console, ['[AO Helper]'].concat(Array.prototype.slice.call(arguments))); }
+
+  // --- SEC-01: HTML sanitization helper ---
+  function escapeHTML(str) {
+    if (typeof str !== 'string') return String(str);
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function safeHTML(html) {
+    // Sanitize generated HTML: strip <script>, on* handlers, javascript: URLs
+    if (typeof html !== 'string') return '';
+    return html
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/\bon\w+\s*=\s*(['"]?)[\s\S]*?\1/gi, '')
+      .replace(/javascript\s*:/gi, 'void:');
+  }
+
+  // --- SEC-07: Feedback cooldown (60 seconds) ---
+  var FEEDBACK_COOLDOWN_MS = 60000;
+
   let currentTab = 'leveling';
   let panelCollapsed = false;
 
   // --- INIT: Try multiple strategies to detect the game ---
   function init() {
-    console.log('[AO Helper] Script cargado en', window.location.href);
+    log('Script cargado en', window.location.href);
 
     // Strategy 1: If we're on /play, try immediately after a delay
     if (window.location.pathname.includes('/play')) {
-      console.log('[AO Helper] Ruta /play detectada, esperando carga del juego...');
+      log('Ruta /play detectada, esperando carga del juego...');
       setTimeout(createPanel, 3000);  // 3 seconds should be enough
       return;
     }
@@ -26,7 +47,7 @@
       if (window.location.href !== lastUrl) {
         lastUrl = window.location.href;
         if (window.location.pathname.includes('/play')) {
-          console.log('[AO Helper] Navegación a /play detectada');
+          log('Navegación a /play detectada');
           setTimeout(createPanel, 3000);
         }
       }
@@ -49,22 +70,22 @@
   function createPanel() {
     // Don't create if already exists
     if (document.getElementById('ao-helper-panel')) {
-      console.log('[AO Helper] Panel ya existe');
+      log('Panel ya existe');
       return;
     }
 
-    console.log('[AO Helper] Creando panel...');
+    log('Creando panel...');
 
     const panel = document.createElement('div');
     panel.id = 'ao-helper-panel';
-    panel.innerHTML = buildPanelHTML();
+    panel.innerHTML = safeHTML(buildPanelHTML());
     document.body.appendChild(panel);
 
     makeResizable(panel);
     attachEvents(panel);
     loadSettings();
 
-    console.log('[AO Helper] ¡Panel creado! Usa Alt+H para mostrar/ocultar.');
+    log('¡Panel creado! Usa Alt+H para mostrar/ocultar.');
   }
 
   // --- Build panel HTML ---
@@ -387,6 +408,7 @@
             '<option value="otro">💬 Otro</option>' +
           '</select>' +
           '<textarea id="aoh-feedback-text" class="aoh-feedback-textarea" rows="5" placeholder="Describí tu sugerencia, bug o pedido acá..."></textarea>' +
+          '<input type="text" id="aoh-feedback-hp" name="website" style="display:none!important;position:absolute;left:-9999px" tabindex="-1" autocomplete="off" />' +
           '<button id="aoh-feedback-send" class="aoh-feedback-send">📨 Enviar sugerencia</button>' +
         '</div>' +
       '</div>' +
@@ -415,27 +437,64 @@
       case 'pois':     html = buildPoisContent(level, classId); break;
       case 'feedback': html = buildFeedbackContent(); break;
     }
-    contentEl.innerHTML = html;
+    contentEl.innerHTML = safeHTML(html);
 
     // Bind feedback send button if on feedback tab
     if (currentTab === 'feedback') {
       var sendBtn = document.getElementById('aoh-feedback-send');
       if (sendBtn) {
-        sendBtn.addEventListener('click', function() {
+        // SEC-07: Show remaining cooldown if active
+        (function checkCooldown() {
+          try {
+            var lastSent = parseInt(localStorage.getItem('ao-helper-last-feedback') || '0');
+            var elapsed = Date.now() - lastSent;
+            if (elapsed < FEEDBACK_COOLDOWN_MS) {
+              var remaining = Math.ceil((FEEDBACK_COOLDOWN_MS - elapsed) / 1000);
+              sendBtn.disabled = true;
+              sendBtn.textContent = '⏳ Esperá ' + remaining + 's';
+              setTimeout(checkCooldown, 1000);
+            }
+          } catch(e) {}
+        })();
+
+        sendBtn.addEventListener('click', function(e) {
+          // SEC-06: Only respond to real user clicks
+          if (!e.isTrusted) return;
+
           var typeEl = document.getElementById('aoh-feedback-type');
           var textEl = document.getElementById('aoh-feedback-text');
+          var hpEl = document.getElementById('aoh-feedback-hp');
           var tipo = typeEl ? typeEl.value : 'sugerencia';
           var texto = textEl ? textEl.value.trim() : '';
+
+          // SEC-02: Honeypot check — bots fill hidden fields
+          if (hpEl && hpEl.value) {
+            sendBtn.textContent = '✅ Enviado';
+            sendBtn.disabled = true;
+            return;
+          }
+
           if (!texto) {
             textEl.placeholder = '⚠️ Escribí algo antes de enviar...';
             textEl.style.borderColor = '#f44336';
             return;
           }
+
+          // SEC-07: Cooldown check (60s between sends)
+          try {
+            var lastSent = parseInt(localStorage.getItem('ao-helper-last-feedback') || '0');
+            if (Date.now() - lastSent < FEEDBACK_COOLDOWN_MS) {
+              var secs = Math.ceil((FEEDBACK_COOLDOWN_MS - (Date.now() - lastSent)) / 1000);
+              sendBtn.textContent = '⏳ Esperá ' + secs + 's';
+              return;
+            }
+          } catch(e) {}
+
           // Disable button while sending
           sendBtn.disabled = true;
           sendBtn.textContent = '⏳ Enviando...';
-          var tipoLabels = { sugerencia: 'Sugerencia', bug: 'Bug/Error', feature: 'Pedido de Feature', datos: 'Corrección de datos', otro: 'Otro' };
-          var tipoLabel = tipoLabels[tipo] || tipo;
+          var validTypes = { sugerencia: 'Sugerencia', bug: 'Bug/Error', feature: 'Pedido de Feature', datos: 'Corrección de datos', otro: 'Otro' };
+          var tipoLabel = validTypes[tipo] || 'Otro';
 
           fetch('https://api.web3forms.com/submit', {
             method: 'POST',
@@ -452,6 +511,8 @@
           .then(function(res) { return res.json(); })
           .then(function(data) {
             if (data.success) {
+              // SEC-07: Save timestamp for cooldown
+              try { localStorage.setItem('ao-helper-last-feedback', String(Date.now())); } catch(e) {}
               textEl.value = '';
               textEl.placeholder = '✅ ¡Sugerencia enviada! Gracias por tu feedback.';
               textEl.style.borderColor = '#8bc34a';
@@ -468,7 +529,7 @@
             textEl.style.borderColor = '#f44336';
             sendBtn.textContent = '❌ Error al enviar';
             sendBtn.disabled = false;
-            console.error('[AO Helper] Error enviando feedback:', err);
+            log('Error enviando feedback:', err);
             setTimeout(function() { sendBtn.textContent = '📨 Enviar sugerencia'; }, 3000);
           });
         });
@@ -597,21 +658,30 @@
 
   function loadSettings() {
     try {
-      var saved = JSON.parse(localStorage.getItem('ao-helper-settings') || '{}');
+      var raw = localStorage.getItem('ao-helper-settings');
+      var saved = {};
+      if (raw) {
+        saved = JSON.parse(raw);
+        if (typeof saved !== 'object' || saved === null) saved = {};
+      }
       var classEl = document.getElementById('aoh-class');
       var levelEl = document.getElementById('aoh-level');
       var panel = document.getElementById('ao-helper-panel');
 
-      if (saved.classId && classEl) classEl.value = saved.classId;
-      if (saved.level && levelEl) levelEl.value = saved.level;
-      if (saved.tab) {
+      // SEC-03: Validate types before using parsed values
+      var validClasses = ['1','2','3','4','5','6','7','8','9','10','11'];
+      if (saved.classId && classEl && validClasses.indexOf(String(saved.classId)) !== -1) classEl.value = saved.classId;
+      var parsedLevel = parseInt(saved.level);
+      if (!isNaN(parsedLevel) && parsedLevel >= 1 && parsedLevel <= 50 && levelEl) levelEl.value = parsedLevel;
+      var validTabs = ['leveling', 'spells', 'equip', 'pois', 'feedback'];
+      if (saved.tab && validTabs.indexOf(saved.tab) !== -1) {
         currentTab = saved.tab;
         document.querySelectorAll('.aoh-tab').forEach(function(t) {
           t.classList.toggle('active', t.getAttribute('data-tab') === currentTab);
         });
       }
-      if (saved.width && panel && !saved.collapsed) panel.style.width = saved.width;
-      if (saved.collapsed) {
+      if (typeof saved.width === 'string' && /^\d+px$/.test(saved.width) && panel && !saved.collapsed) panel.style.width = saved.width;
+      if (saved.collapsed === true) {
         panelCollapsed = true;
         var body = document.getElementById('aoh-body');
         var resizeHandle = document.getElementById('aoh-resize-handle');

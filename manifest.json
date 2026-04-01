@@ -5,6 +5,9 @@
   "description": "Overlay con guía de leveo, hechizos, items y mapa para Argentum Online Web",
   "permissions": ["storage"],
   "host_permissions": ["https://api.web3forms.com/*"],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'"
+  },
   "content_scripts": [
     {
       "matches": ["*://aoweb.app/*", "*://www.aoweb.app/*"],

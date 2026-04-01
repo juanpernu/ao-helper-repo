@@ -1,0 +1,68 @@
+name: Release Extension
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+
+      - name: Inject Web3Forms key
+        env:
+          WEB3FORMS_KEY: ${{ secrets.WEB3FORMS_KEY }}
+        run: |
+          printf "window.AO_CONFIG = {\n  WEB3FORMS_KEY: '%s'\n};\n" "$WEB3FORMS_KEY" > config.js
+
+      - name: Package extension
+        run: zip -r ao-helper-extension-${{ steps.version.outputs.VERSION }}.zip manifest.json config.js data.js content.js overlay.css popup.html icons/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "${{ steps.version.outputs.VERSION }} — Primera versión pública"
+          body: |
+            ## 🧙 AO Web Helper — Guía interactiva para Argentum Online Web
+
+            Primera versión de la extensión de Chrome que agrega un panel lateral con toda la info que necesitás mientras jugás en [aoweb.app](https://aoweb.app).
+
+            ### ¿Qué incluye?
+
+            - **📍 Guía de Leveo** — Zonas recomendadas por nivel con criaturas, exp aproximada y cómo llegar a cada dungeon (con número de mapa de entrada)
+            - **✨ Hechizos** — Todos los hechizos por clase con maná, daño, precio, skill mínimo y en qué NPC comprarlos (ciudad + mapa)
+            - **🛡️ Equipamiento** — Armas, armaduras y accesorios recomendados por clase y nivel, con stats, precios y dónde conseguirlos
+            - **🗺️ Mapa** — Todas las ciudades, dungeons y puntos de interés del juego
+            - **💡 Sugerencias** — Formulario integrado para reportar bugs o pedir features
+
+            ### Características
+
+            - Soporta las 11 clases del juego
+            - Se adapta automáticamente a tu clase y nivel
+            - Panel redimensionable y minimizable
+            - Atajo de teclado Alt+H para mostrar/ocultar
+            - Recuerda tu configuración entre sesiones
+            - Datos extraídos directamente de los repos oficiales del servidor
+
+            ### Seguridad
+
+            - Manifest V3 con permisos mínimos
+            - Solo funciona en aoweb.app
+            - Sanitización de HTML, Content Security Policy explícita
+            - Sin acceso a datos personales ni modificación del juego
+
+            ### Cómo instalar
+
+            Descargá el archivo `ao-helper-extension-${{ steps.version.outputs.VERSION }}.zip` de abajo, descomprimilo, y seguí las [instrucciones paso a paso en el README](https://github.com/${{ github.repository }}#cómo-instalar-paso-a-paso).
+
+            ---
+            hecho con 💜 por [Juanpernu](https://www.juanpernumian.com.ar)
+          files: ao-helper-extension-${{ steps.version.outputs.VERSION }}.zip

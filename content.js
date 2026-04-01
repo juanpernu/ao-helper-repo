@@ -490,6 +490,14 @@
             }
           } catch(e) {}
 
+          // Check API key is configured
+          if (!window.AO_CONFIG || !window.AO_CONFIG.WEB3FORMS_KEY) {
+            sendBtn.textContent = '❌ Config faltante';
+            log('WEB3FORMS_KEY no configurada en config.js');
+            setTimeout(function() { sendBtn.textContent = '📨 Enviar sugerencia'; }, 3000);
+            return;
+          }
+
           // Disable button while sending
           sendBtn.disabled = true;
           sendBtn.textContent = '⏳ Enviando...';
@@ -500,7 +508,7 @@
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              access_key: (window.AO_CONFIG && window.AO_CONFIG.WEB3FORMS_KEY) || 'MISSING_KEY',
+              access_key: window.AO_CONFIG && window.AO_CONFIG.WEB3FORMS_KEY,
               subject: '[AO Helper] ' + tipoLabel,
               from_name: 'AO Helper Feedback',
               tipo: tipoLabel,

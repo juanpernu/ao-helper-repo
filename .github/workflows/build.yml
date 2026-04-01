@@ -1,0 +1,27 @@
+name: Build Extension
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Inject Web3Forms key
+        env:
+          WEB3FORMS_KEY: ${{ secrets.WEB3FORMS_KEY }}
+        run: |
+          printf "window.AO_CONFIG = {\n  WEB3FORMS_KEY: '%s'\n};\n" "$WEB3FORMS_KEY" > config.js
+
+      - name: Package extension
+        run: zip -r ao-helper-extension.zip manifest.json config.js data.js content.js overlay.css popup.html icons/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ao-helper-extension
+          path: ao-helper-extension.zip

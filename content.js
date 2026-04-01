@@ -441,7 +441,7 @@
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              access_key: 'TU_ACCESS_KEY_ACA',
+              access_key: (window.AO_CONFIG && window.AO_CONFIG.WEB3FORMS_KEY) || 'MISSING_KEY',
               subject: '[AO Helper] ' + tipoLabel,
               from_name: 'AO Helper Feedback',
               tipo: tipoLabel,

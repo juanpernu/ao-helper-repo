@@ -17,3 +17,6 @@ package-lock.json
 *.crx
 *.pem
 *.zip
+
+# API keys / secrets
+config.js

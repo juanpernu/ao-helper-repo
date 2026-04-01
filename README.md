@@ -35,24 +35,17 @@ Mago, Clérigo, Guerrero, Asesino, Ladrón, Bardo, Druida, Paladín, Cazador, Tr
 - **Alt + H** — Mostrar/ocultar el panel
 - El sidebar es **redimensionable** arrastrando el borde derecho
 
-## Configuración del formulario de sugerencias
-
-El formulario de feedback usa [Web3Forms](https://web3forms.com) para enviar emails. Para activarlo:
-
-1. Entrá a [web3forms.com](https://web3forms.com)
-2. Ingresá tu email y obtendrás un **access key**
-3. En `content.js`, buscá `'TU_ACCESS_KEY_ACA'` y reemplazalo por tu key
-
 ## Estructura del proyecto
 
 ```
-ao-helper-extension/
-├── manifest.json    # Chrome Extension Manifest V3
-├── data.js          # Datos del juego (leveling, spells, equipment, POIs)
-├── content.js       # Script principal que inyecta el sidebar
-├── overlay.css      # Estilos del sidebar
-├── popup.html       # Popup de la extensión
-└── icons/           # Íconos de la extensión (16, 48, 128px)
+ao-helper-repo/
+├── manifest.json       # Chrome Extension Manifest V3
+├── config.js           # Configuración local (gitignored)
+├── data.js             # Datos del juego (leveling, spells, equipment, POIs)
+├── content.js          # Script principal que inyecta el sidebar
+├── overlay.css         # Estilos del sidebar
+├── popup.html          # Popup de la extensión
+└── icons/              # Íconos de la extensión (16, 48, 128px)
 ```
 
 ## Datos del juego

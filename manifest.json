@@ -8,7 +8,7 @@
   "content_scripts": [
     {
       "matches": ["*://aoweb.app/*", "*://www.aoweb.app/*"],
-      "js": ["data.js", "content.js"],
+      "js": ["config.js", "data.js", "content.js"],
       "css": ["overlay.css"],
       "run_at": "document_idle"
     }
